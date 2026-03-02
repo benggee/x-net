@@ -18,6 +18,10 @@ struct TCPServer *tcp_server_init(struct event_loop *ev_loop, struct acceptor *a
                                   connection_closed_callback conn_closed_callback,
                                   int thread_num) {
     struct TCPServer *tcp_server = malloc(sizeof(struct TCPServer));
+    if (!tcp_server) {
+        perror("malloc tcp_server failed");
+        return NULL;
+    }
 
     tcp_server->ev_loop = ev_loop;
     tcp_server->acceptor = acceptor;
@@ -27,6 +31,10 @@ struct TCPServer *tcp_server_init(struct event_loop *ev_loop, struct acceptor *a
     tcp_server->conn_close_callback = conn_closed_callback;
     tcp_server->thread_num = thread_num;
     tcp_server->th_pool = thread_pool_new(ev_loop, thread_num);
+    if (!tcp_server->th_pool) {
+        free(tcp_server);
+        return NULL;
+    }
     tcp_server->data = NULL;
 
     return tcp_server;
@@ -34,6 +42,10 @@ struct TCPServer *tcp_server_init(struct event_loop *ev_loop, struct acceptor *a
 
 int handle_connection_established(void *data) {
     struct TCPServer *tcp_server = (struct TCPServer *) data;
+    if (!tcp_server || !tcp_server->acceptor) {
+        return -1;
+    }
+
     struct acceptor *acceptor = tcp_server->acceptor;
     int listen_fd = acceptor->listen_fd;
 
@@ -42,17 +54,31 @@ int handle_connection_established(void *data) {
     struct sockaddr_in client_addr;
     socklen_t cli_len = sizeof(client_addr);
     int conn_fd = accept(listen_fd, (struct sockaddr*)&client_addr, &cli_len);
+    if (conn_fd < 0) {
+        perror("accept failed");
+        return -1;
+    }
+
     make_nonblocking(conn_fd);
 
     x_msgx("new conn established, fd=%d", conn_fd);
 
     struct event_loop *ev_loop = thread_pool_get_loop(tcp_server->th_pool);
+    if (!ev_loop) {
+        close(conn_fd);
+        return -1;
+    }
 
     struct tcp_connection *tcp_conn = tcp_connection_new(conn_fd, ev_loop,
                                                          tcp_server->conn_completed_callback,
                                                          tcp_server->msg_callback,
                                                          tcp_server->w_completed_callback,
                                                          tcp_server->conn_close_callback);
+    if (!tcp_conn) {
+        close(conn_fd);
+        return -1;
+    }
+
     if (tcp_server->data != NULL) {
         tcp_conn->data = tcp_server->data;
     }

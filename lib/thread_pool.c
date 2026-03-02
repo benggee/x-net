@@ -5,6 +5,10 @@
 
 struct thread_pool *thread_pool_new(struct event_loop *main_loop, int thread_number) {
     struct thread_pool *th_pool = malloc(sizeof(struct thread_pool));
+    if (!th_pool) {
+        return NULL;
+    }
+
     th_pool->main_loop = main_loop;
     th_pool->position = 0;
     th_pool->thread_number = thread_number;
@@ -14,6 +18,10 @@ struct thread_pool *thread_pool_new(struct event_loop *main_loop, int thread_num
 }
 
 void thread_pool_start(struct thread_pool *th_pool) {
+    if (!th_pool) {
+        return;
+    }
+
     assert(!th_pool->started);
     assert_in_same_thread(th_pool->main_loop);
 
@@ -25,6 +33,11 @@ void thread_pool_start(struct thread_pool *th_pool) {
     }
 
     th_pool->ev_loop_threads = malloc(th_pool->thread_number * sizeof(struct event_loop_thread));
+    if (!th_pool->ev_loop_threads) {
+        perror("malloc ev_loop_threads failed");
+        return;
+    }
+
     for (int i = 0; i < th_pool->thread_number; ++i) {
         event_loop_thread_init(&th_pool->ev_loop_threads[i], i);
         event_loop_thread_start(&th_pool->ev_loop_threads[i]);

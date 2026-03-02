@@ -23,9 +23,12 @@ int process_status_line(char *start, char *end, struct http_request *http_req) {
     assert(space != NULL);
 
     int method_size = space - start;
-    http_req->method = malloc(method_size + 1);
-    strncpy(http_req->method, start, method_size);
-    http_req->method[method_size] = '\0';
+    http_req->method_str = malloc(method_size + 1);
+    strncpy(http_req->method_str, start, method_size);
+    http_req->method_str[method_size] = '\0';
+
+    // Set method enum
+    http_req->method = http_request_get_method(http_req);
 
     assert(space + 1 < end);
     // get url
@@ -37,14 +40,18 @@ int process_status_line(char *start, char *end, struct http_request *http_req) {
     int url_size = space - start;
     http_req->url = malloc(url_size + 1);
     strncpy(http_req->url, start, space - start);
-    http_req->url[url_size + 1] = '\0';
+    http_req->url[url_size] = '\0';
+
+    // Parse query string
+    http_request_parse_query_string(http_req);
 
     // get version
     start = space + 1;
-    http_req->version = malloc(end - start +1);
+    http_req->version = malloc(end - start + 1);
     strncpy(http_req->version, start, end - start);
-    http_req->version[end - start + 1] = '\0';
+    http_req->version[end - start] = '\0';
     assert(space != NULL);
+
     return size;
 }
 
@@ -72,9 +79,9 @@ int parse_http_request(struct buffer *input, struct http_request *http_req) {
                     strncpy(key, start, colon - start);
                     key[colon - start] = '\0';
 
-                    char *value = malloc(crlf - colon - 2 +1);
-                    strncpy(value, colon + 2, crlf - colon -2);
-                    value[crlf - colon -2] = '\0';
+                    char *value = malloc(crlf - colon - 2 + 1);
+                    strncpy(value, colon + 2, crlf - colon - 2);
+                    value[crlf - colon - 2] = '\0';
 
                     http_request_add_header(http_req, key, value);
 
@@ -82,6 +89,8 @@ int parse_http_request(struct buffer *input, struct http_request *http_req) {
                     input->read_index += 2;
                 } else {
                     input->read_index += 2;
+                    // Parse cookies after all headers are parsed
+                    http_request_parse_cookies(http_req);
                     http_req->current_state = REQUEST_DONE;
                 }
             }

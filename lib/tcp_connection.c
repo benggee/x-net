@@ -8,19 +8,46 @@ struct tcp_connection *tcp_connection_new(int fd, struct event_loop *ev_loop, co
                                          write_completed_callback w_completed_callback,
                                          connection_closed_callback conn_closed_callback) {
     struct tcp_connection *tcp_conn = malloc(sizeof(struct tcp_connection));
+    if (!tcp_conn) {
+        return NULL;
+    }
+
     tcp_conn->w_completed_callback = w_completed_callback;
     tcp_conn->msg_callback = msg_callback;
     tcp_conn->conn_completed_callback = conn_completed_callback;
     tcp_conn->conn_closed_callback = conn_closed_callback;
     tcp_conn->ev_loop = ev_loop;
     tcp_conn->input_buffer = buffer_new();
-    tcp_conn->output_buffer = buffer_new();
+    if (!tcp_conn->input_buffer) {
+        free(tcp_conn);
+        return NULL;
+    }
 
-    char *buf = malloc(16);
-    sprintf(buf, "connection-%d\0", fd);
+    tcp_conn->output_buffer = buffer_new();
+    if (!tcp_conn->output_buffer) {
+        buffer_free(tcp_conn->input_buffer);
+        free(tcp_conn);
+        return NULL;
+    }
+
+    char *buf = malloc(32);
+    if (!buf) {
+        buffer_free(tcp_conn->input_buffer);
+        buffer_free(tcp_conn->output_buffer);
+        free(tcp_conn);
+        return NULL;
+    }
+    snprintf(buf, 32, "connection-%d", fd);
     tcp_conn->name = buf;
 
     struct channel *chan = channel_new(fd, EVENT_READ, handle_read, handle_write, tcp_conn);
+    if (!chan) {
+        free(tcp_conn->name);
+        buffer_free(tcp_conn->input_buffer);
+        buffer_free(tcp_conn->output_buffer);
+        free(tcp_conn);
+        return NULL;
+    }
     tcp_conn->channel = chan;
 
     if (tcp_conn->conn_completed_callback != NULL) {

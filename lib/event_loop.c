@@ -24,6 +24,10 @@ struct event_loop *event_loop_init() {
 
 struct event_loop *event_loop_init_with_name(char *thread_name) {
     struct event_loop *ev_loop = malloc(sizeof(struct event_loop));
+    if (!ev_loop) {
+        return NULL;
+    }
+
     pthread_mutex_init(&ev_loop->mutex, NULL);
     pthread_cond_init(&ev_loop->cond, NULL);
 
@@ -35,6 +39,10 @@ struct event_loop *event_loop_init_with_name(char *thread_name) {
 
     ev_loop->quit = 0;
     ev_loop->chan_map = malloc(sizeof(struct channel_map));
+    if (!ev_loop->chan_map) {
+        free(ev_loop);
+        return NULL;
+    }
     map_init(ev_loop->chan_map);
 
 #ifdef EPOLL_ENABLE
@@ -44,16 +52,31 @@ struct event_loop *event_loop_init_with_name(char *thread_name) {
 #endif
 
     ev_loop->event_dispatcher_data = ev_loop->ev_dispatcher->init(ev_loop);
+    if (!ev_loop->event_dispatcher_data) {
+        free(ev_loop->chan_map);
+        free(ev_loop);
+        return NULL;
+    }
 
     ev_loop->owner_thread_id = pthread_self();
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, ev_loop->socket_pair) < 0) {
         perror("socketpair set failed.");
+        free(ev_loop->chan_map);
+        free(ev_loop);
+        return NULL;
     }
     ev_loop->is_handle_pending = 0;
     ev_loop->pending_head = NULL;
     ev_loop->pending_tail = NULL;
 
     struct channel *chan = channel_new(ev_loop->socket_pair[1], EVENT_READ, handle_wakeup, NULL, ev_loop);
+    if (!chan) {
+        close(ev_loop->socket_pair[0]);
+        close(ev_loop->socket_pair[1]);
+        free(ev_loop->chan_map);
+        free(ev_loop);
+        return NULL;
+    }
     event_loop_add_channel_event(ev_loop, ev_loop->socket_pair[1], chan);
 
     return ev_loop;

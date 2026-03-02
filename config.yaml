@@ -1,0 +1,39 @@
+# X-Net Server Configuration
+# This is the default configuration file for the x-net server
+
+# Server listening port (default: 3000)
+port: 3000
+
+# Server listening address (default: 0.0.0.0 for all interfaces)
+host: "0.0.0.0"
+
+# Number of worker threads (default: 4)
+# Recommended: number of CPU cores
+thread_num: 4
+
+# Connection timeout in seconds (default: 30)
+timeout: 30
+
+# Maximum number of concurrent connections (default: 1024)
+max_connections: 1024
+
+# Log file path (default: x-net.log)
+log_file: "x-net.log"
+
+# Log level: 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG (default: 1)
+log_level: 1
+
+# Buffer size in bytes (default: 65535)
+buffer_size: 65535
+
+# Keep-alive timeout in seconds (default: 60)
+keep_alive_timeout: 60
+
+# Maximum request size in bytes (default: 10MB)
+max_request_size: 10485760
+
+# Advanced settings
+# Uncomment and modify as needed
+
+# Enable epoll (Linux): 1=enabled, 0=disabled
+# epoll_enable: 1

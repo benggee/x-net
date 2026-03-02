@@ -11,6 +11,10 @@ struct buffer *buffer_new() {
     }
 
     buf->data = malloc(INIT_BUFFER_SIZE);
+    if (!buf->data) {
+        free(buf);
+        return NULL;
+    }
     buf->read_index = 0;
     buf->write_index = 0;
     buf->total_size = INIT_BUFFER_SIZE;
@@ -35,6 +39,10 @@ int buffer_front_spare_size(struct buffer *buf) {
 }
 
 void make_room(struct buffer *buf, int size) {
+    if (!buf) {
+        return;
+    }
+
     if (buffer_writeable_size(buf) >= size) {
         return;
     }
@@ -59,29 +67,45 @@ void make_room(struct buffer *buf, int size) {
 
 // write data into buffer
 int buffer_append(struct buffer *buf, void *data, int size) {
-    if (data != NULL) {
-        make_room(buf, size);
-        memcpy(buf->data + buf->write_index, data, size);
-        buf->write_index += size;
+    if (!buf || !data || size <= 0) {
+        return -1;
     }
+
+    make_room(buf, size);
+    memcpy(buf->data + buf->write_index, data, size);
+    buf->write_index += size;
+
+    return size;
 }
 
 // write a char into buffer
 int buffer_append_char(struct buffer *buf, char c) {
+    if (!buf) {
+        return -1;
+    }
+
     make_room(buf, 1);
     buf->data[buf->write_index++] = c;
+
+    return 1;
 }
 
 // write a string into buffer
 int buffer_append_string(struct buffer *buf, char *s) {
-    if (s != NULL) {
-        int size = strlen(s);
-        buffer_append(buf, s, size);
+    if (!buf || !s) {
+        return -1;
     }
+
+    int size = strlen(s);
+    return buffer_append(buf, s, size);
 }
 
 // write to buffer, the data is from socket
 int buffer_socket_read(struct buffer *buf, int fd) {
+    if (!buf) {
+        return -1;
+    }
+
     char additional_buffer[INIT_BUFFER_SIZE];
     struct iovec vec[2];
     int max_writable = buffer_writeable_size(buf);
@@ -104,13 +128,33 @@ int buffer_socket_read(struct buffer *buf, int fd) {
 
 // read data from buffer
 int buffer_read(struct buffer *buf, void *data, int size) {
-    char c = buf->data[buf->read_index];
-    buf->read_index++;
-    return c;
+    if (!buf || !data || size <= 0) {
+        return -1;
+    }
+
+    int readable = buffer_readable_size(buf);
+    if (readable <= 0) {
+        return 0;
+    }
+
+    int to_read = size < readable ? size : readable;
+    memcpy(data, buf->data + buf->read_index, to_read);
+    buf->read_index += to_read;
+
+    return to_read;
 }
 
 // read a char from buffer
 int buffer_read_char(struct buffer *buf) {
+    if (!buf) {
+        return -1;
+    }
+
+    int readable = buffer_readable_size(buf);
+    if (readable <= 0) {
+        return -1;
+    }
+
     char c = buf->data[buf->read_index];
     buf->read_index++;
     return c;
